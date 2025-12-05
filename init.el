@@ -245,34 +245,7 @@
    ("C-x <down>" . windmove-down)))
 
 (use-package transient
-  :ensure nil
-  :general
-  (:prefix "C-c w"
-   "" '(:ignore t :which-key "window")
-   "r" 'iota/window-resize)
-  :config
-  (defun iota/--icon (icon-func icon-name fallback)
-    "Get nerd ICON-NAME using ICON-FUNC, or FALLBACK if unavailable."
-    (if (featurep 'nerd-icons)
-        (funcall icon-func icon-name)
-      fallback))
-
-  (transient-define-prefix iota/window-resize ()
-    "Resize windows interactively."
-    [["Vertical"
-      ("k" (lambda () (concat (iota/--icon 'nerd-icons-codicon "nf-cod-arrow_up" "↑") " Taller"))
-       enlarge-window :transient t)
-      ("j" (lambda () (concat (iota/--icon 'nerd-icons-codicon "nf-cod-arrow_down" "↓") " Shorter"))
-       shrink-window :transient t)]
-     ["Horizontal"
-      ("l" (lambda () (concat (iota/--icon 'nerd-icons-codicon "nf-cod-arrow_right" "→") " Wider"))
-       enlarge-window-horizontally :transient t)
-      ("h" (lambda () (concat (iota/--icon 'nerd-icons-codicon "nf-cod-arrow_left" "←") " Narrower"))
-       shrink-window-horizontally :transient t)]
-     ["Quick"
-      ("=" (lambda () (concat (iota/--icon 'nerd-icons-mdicon "nf-md-view_grid_outline" "⊞") " Balance"))
-       balance-windows :transient t)
-      ("q" "Quit" transient-quit-one)]]))
+  :ensure nil)
 
 ;;; ============================================================================
 ;;; Completion & Navigation Framework
