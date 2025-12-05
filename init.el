@@ -53,6 +53,7 @@
 ;; Setup use-package
 (require 'use-package)
 (setq use-package-always-ensure t)
+(setq use-package-verbose t) ; Show more details for debugging
 
 ;; Essential keybinding infrastructure
 (use-package general
@@ -63,7 +64,7 @@
   :ensure nil
   :hook (after-init . which-key-mode)
   :custom
-  (which-key-idle-delay 1.5)
+  (which-key-idle-delay 0.5)
   (which-key-idle-secondary-delay 0.25)
   (which-key-add-column-padding 1)
   (which-key-max-description-length 40))
@@ -87,11 +88,32 @@
         show-paren-style 'parenthesis)
   (add-hook 'tty-setup-hook #'xterm-mouse-mode)
   (add-hook 'after-init-hook #'show-paren-mode)
+
   :config
   (set-face-attribute 'show-paren-match nil
                       :background 'unspecified
                       :foreground 'unspecified
-                      :weight 'bold))
+                      :weight 'bold)
+
+  ;; Prevent *Compile-Log* from popping up in windows
+  (add-to-list 'display-buffer-alist
+               '("\\*Compile-Log\\*"
+                 (display-buffer-no-window)
+                 (allow-no-window . t)))
+
+  ;; Suppress warnings during startup
+  (defun iota/suppress-startup-warnings (orig-fun &rest args)
+    "Suppress non-critical warnings during startup."
+    (let ((warning-minimum-level :error))
+      (apply orig-fun args)))
+
+  (advice-add 'display-warning :around #'iota/suppress-startup-warnings)
+
+  ;; Remove the advice after startup completes
+  (add-hook 'emacs-startup-hook
+            (lambda ()
+              (advice-remove 'display-warning #'iota/suppress-startup-warnings))
+            99))
 
 (use-package uniquify
   :ensure nil
@@ -287,6 +309,8 @@
                  (window-parameters (mode-line-format . none)))))
 
 (use-package embark-consult
+  :ensure t
+  :after (embark consult)
   :hook (embark-collect-mode . consult-preview-at-point-mode))
 
 (use-package consult
@@ -448,6 +472,9 @@
 ;;; Code Structure & Navigation
 ;;; ============================================================================
 
+(use-package nerd-icons
+  :ensure t)
+
 (use-package outline
   :ensure nil
   :general
@@ -597,11 +624,9 @@
       (setq denote-directory silo-dir)
       silo-dir))
 
-  (add-hook 'find-file-hook #'iota/denote-silo-for-project)
+  ;; Only create silos when actually using denote commands, not on every file open
   (advice-add 'denote :before (lambda (&rest _) (iota/denote-silo-for-project)))
-  (advice-add 'denote-open-or-create :before (lambda (&rest _) (iota/denote-silo-for-project)))
-
-  (iota/denote-silo-for-project))
+  (advice-add 'denote-open-or-create :before (lambda (&rest _) (iota/denote-silo-for-project))))
 
 (use-package denote-markdown
   :ensure t
@@ -780,30 +805,50 @@
   ;; Set the tools to use
   (setq gptel-tools (gptel-get-tool "misc")))
 
-(use-package copilot
-  :vc (:url "https://github.com/copilot-emacs/copilot.el"
-       :rev :newest
-       :branch "main")
-  :hook (prog-mode . copilot-mode)
-  :bind (:map copilot-completion-map
-              ("<tab>" . copilot-accept-completion)
-              ("TAB" . copilot-accept-completion)
-              ("C-TAB" . copilot-accept-completion-by-word)
-              ("C-<tab>" . copilot-accept-completion-by-word)
-              ("M-f" . copilot-accept-completion-by-word)
-              ("M-<right>" . copilot-accept-completion-by-word)
-              ("C-e" . copilot-accept-completion-by-line)
-              ("<end>" . copilot-accept-completion-by-line)
-              ("M-n" . copilot-next-completion)
-              ("M-p" . copilot-previous-completion))
-  :custom
-  (copilot-idle-delay 0.2)
-  (copilot-indent-offset-warning-disable t)
-  (copilot-install-dir (locate-user-emacs-file "iota-cache/copilot"))
-  :config
-  ;; Prevent copilot from interfering with completion-preview-mode
-  (add-to-list 'copilot-disable-predicates
-               (lambda () (bound-and-true-p completion-preview-active-mode))))
+;; Copilot configuration with robust error handling
+;; Wrapped in with-demoted-errors to prevent bootstrap failures
+(with-demoted-errors "Copilot setup error: %S"
+  (use-package copilot
+    :ensure nil  ; Using :vc instead of :ensure
+    :vc (:url "https://github.com/copilot-emacs/copilot.el"
+         :rev :newest
+         :branch "main")
+    :defer t
+    :defines (copilot-completion-map copilot-disable-predicates)
+    :functions (copilot-mode)
+    :custom
+    (copilot-idle-delay 0.2)
+    (copilot-indent-offset-warning-disable t)
+    (copilot-install-dir (locate-user-emacs-file "iota-cache/copilot"))
+    :init
+    ;; Add hook with error handling to prevent bootstrap failures
+    (defun iota/enable-copilot-maybe ()
+      "Enable copilot-mode if available, with error handling."
+      (when (and (fboundp 'copilot-mode)
+                 (not (bound-and-true-p copilot-mode)))
+        (condition-case err
+            (copilot-mode 1)
+          (error (message "Copilot activation failed: %s" err)))))
+
+    (add-hook 'prog-mode-hook #'iota/enable-copilot-maybe)
+    :config
+    ;; Keybindings - only set if the map exists
+    (when (boundp 'copilot-completion-map)
+      (define-key copilot-completion-map (kbd "<tab>") 'copilot-accept-completion)
+      (define-key copilot-completion-map (kbd "TAB") 'copilot-accept-completion)
+      (define-key copilot-completion-map (kbd "C-TAB") 'copilot-accept-completion-by-word)
+      (define-key copilot-completion-map (kbd "C-<tab>") 'copilot-accept-completion-by-word)
+      (define-key copilot-completion-map (kbd "M-f") 'copilot-accept-completion-by-word)
+      (define-key copilot-completion-map (kbd "M-<right>") 'copilot-accept-completion-by-word)
+      (define-key copilot-completion-map (kbd "C-e") 'copilot-accept-completion-by-line)
+      (define-key copilot-completion-map (kbd "<end>") 'copilot-accept-completion-by-line)
+      (define-key copilot-completion-map (kbd "M-n") 'copilot-next-completion)
+      (define-key copilot-completion-map (kbd "M-p") 'copilot-previous-completion))
+
+    ;; Prevent copilot from interfering with completion-preview-mode
+    (when (boundp 'copilot-disable-predicates)
+      (add-to-list 'copilot-disable-predicates
+                   (lambda () (bound-and-true-p completion-preview-active-mode))))))
 
 ;;; ============================================================================
 ;;; Themes & Visual Appearance
@@ -833,20 +878,30 @@
 (defun iota/load-random-dark-theme ()
   "Load a random dark theme from Modus, Ef, or Doric collections."
   (interactive)
-  (let ((choice (random 3)))
-    (pcase choice
-      (0 (modus-themes-load-random-dark))
-      (1 (ef-themes-load-random-dark))
-      (2 (doric-themes-load-random 'dark)))))
+  (condition-case err
+      (let ((choice (random 3)))
+        (pcase choice
+          (0 (when (fboundp 'modus-themes-load-random-dark)
+               (modus-themes-load-random-dark)))
+          (1 (when (fboundp 'ef-themes-load-random-dark)
+               (ef-themes-load-random-dark)))
+          (2 (when (fboundp 'doric-themes-load-random)
+               (doric-themes-load-random 'dark)))))
+    (error (message "Failed to load random dark theme: %s" err))))
 
 (defun iota/load-random-light-theme ()
   "Load a random light theme from Modus, Ef, or Doric collections."
   (interactive)
-  (let ((choice (random 3)))
-    (pcase choice
-      (0 (modus-themes-load-random-light))
-      (1 (ef-themes-load-random-light))
-      (2 (doric-themes-load-random 'light)))))
+  (condition-case err
+      (let ((choice (random 3)))
+        (pcase choice
+          (0 (when (fboundp 'modus-themes-load-random-light)
+               (modus-themes-load-random-light)))
+          (1 (when (fboundp 'ef-themes-load-random-light)
+               (ef-themes-load-random-light)))
+          (2 (when (fboundp 'doric-themes-load-random)
+               (doric-themes-load-random 'light)))))
+    (error (message "Failed to load random light theme: %s" err))))
 
 ;; Theme keybindings
 (general-define-key
@@ -858,20 +913,18 @@
  "r" 'iota/load-random-dark-theme
  "R" 'iota/load-random-light-theme)
 
-;; Load a random dark theme at startup
-(iota/load-random-dark-theme)
+;; Load a random dark theme at startup (after init completes)
+(add-hook 'after-init-hook #'iota/load-random-dark-theme)
 
 ;; me-likey themes:
 ;; - doric-dark
 ;; - doric-obsidian
 
-(use-package nerd-icons
-  :ensure t)
-
 (use-package doom-modeline
   :ensure t
   :after nerd-icons
-  :init (doom-modeline-mode 1)
+  :config
+  (doom-modeline-mode 1)
   :custom
   ;; Height and bar
   (doom-modeline-height 25)
@@ -990,6 +1043,7 @@ If a header already exists, update it. Otherwise, insert a new one."
 
 (use-package iota
   :ensure nil
+  :demand t  ; Force immediate loading, not deferred
   :load-path "~/Development/iota/"
   :general
   ("C-c i" 'iota-dispatch)  ; Main dispatch at C-c i
@@ -1020,5 +1074,6 @@ If a header already exists, update it. Otherwise, insert a new one."
   (iota-popup-mode 1)
   (iota-dimmer-mode 1)
   (iota-window-mode 1) ;; automatic in iota
+
   :hook
   (emacs-startup-hook . iota-splash-screen))
