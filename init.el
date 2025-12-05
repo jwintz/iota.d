@@ -646,7 +646,58 @@
    "P" 'magit-pull)
   :config
   (setq magit-display-buffer-function
-        (lambda (buffer) (display-buffer buffer '(display-buffer-same-window)))))
+        (lambda (buffer) (display-buffer buffer '(display-buffer-same-window))))
+
+  ;; AI-powered commit message generation
+  (defun iota/generate-commit-message ()
+    "Generate a commit message using AI based on staged changes.
+Uses gptel with the configured backend (Copilot) to analyze the diff
+and generate a conventional commit message."
+    (interactive)
+    (unless (derived-mode-p 'git-commit-mode 'text-mode)
+      (user-error "This command should be run in a git commit buffer"))
+    ;; Ensure gptel is loaded
+    (require 'gptel nil t)
+    (let* ((default-directory (or (magit-toplevel) default-directory))
+           (diff (shell-command-to-string "git diff --cached --no-color"))
+           (prompt (format "Generate a concise git commit message for the following changes.
+Follow the Conventional Commits format: <type>(<scope>): <description>
+
+Types: feat, fix, docs, style, refactor, perf, test, build, ci, chore
+- Keep the first line under 72 characters
+- Use imperative mood (\"add\" not \"added\")
+- Be specific but concise
+- If there are multiple changes, summarize the main purpose
+
+Diff:
+%s
+
+Generate ONLY the commit message, no explanations:" diff)))
+      (if (string-empty-p (string-trim diff))
+          (message "No staged changes to generate commit message for")
+        ;; Show processing message
+        (message "Generating commit message...")
+        ;; Use gptel to generate the message
+        (if (fboundp 'gptel-request)
+            (gptel-request prompt
+              :callback (lambda (response info)
+                          (if (not response)
+                              (message "Failed to generate commit message: %s" (plist-get info :status))
+                            ;; Clean and insert the response
+                            (let ((msg (string-trim response)))
+                              ;; Remove markdown code blocks if present
+                              (when (string-match "```\\(?:.*\n\\)?\\(\\(?:.\\|\n\\)*?\\)```" msg)
+                                (setq msg (match-string 1 msg)))
+                              (setq msg (string-trim msg))
+                              ;; Insert at point
+                              (goto-char (point-min))
+                              (insert msg)
+                              (message "Commit message generated")))))
+          (message "gptel is not available - install and configure gptel first")))))
+
+  ;; Bind in git-commit-mode
+  (with-eval-after-load 'git-commit
+    (define-key git-commit-mode-map (kbd "C-c C-g") #'iota/generate-commit-message)))
 
 (use-package project
   :demand t
