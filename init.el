@@ -4,6 +4,14 @@
 ;;; Bootstrap & Core Infrastructure
 ;;; ============================================================================
 
+;; Disable UI chrome immediately (before any frame rendering)
+(menu-bar-mode -1)
+(when (fboundp 'tool-bar-mode) (tool-bar-mode -1))
+(when (fboundp 'scroll-bar-mode) (scroll-bar-mode -1))
+(setq inhibit-startup-screen t)
+(setq inhibit-startup-echo-area-message t)
+(setq initial-buffer-choice nil)
+
 ;; Optimize Garbage Collection during startup
 (setq gc-cons-threshold most-positive-fixnum)
 (add-hook 'emacs-startup-hook
@@ -27,6 +35,100 @@
 ;;             (profiler-stop)
 ;;             (profiler-report)))
 
+;; ============================================================================
+;; IOTA Directory Structure & Bootstrap State
+;; ============================================================================
+
+;; Define all required directories upfront
+(defvar iota--required-dirs
+  '("iota-config"
+    "iota-packages/elpa"
+    "iota-tmp/auto-save-list"
+    "iota-tmp/auto-save"
+    "iota-data/transient"
+    "iota-data/eshell"
+    "iota-data/silo"
+    "iota-cache/copilot"
+    "iota-cache/gptel"
+    "iota-cache/copilot-chat")
+  "List of directories required by IOTA configuration.")
+
+;; Pre-create all directories silently (no prompts!)
+(dolist (dir iota--required-dirs)
+  (let ((full-path (locate-user-emacs-file dir)))
+    (unless (file-directory-p full-path)
+      (make-directory full-path t))))
+
+;; Check if this is a bootstrap run (first time setup)
+(defvar iota--bootstrap-needed-p
+  (not (file-exists-p (locate-user-emacs-file "iota-packages/elpa/archives/melpa/archive-contents")))
+  "Non-nil if this is the first run and packages need to be installed.")
+
+;; Bootstrap splash screen state
+(defvar iota--bootstrap-buffer nil "Buffer used for bootstrap splash.")
+(defvar iota--bootstrap-message "" "Current installation message.")
+
+(defun iota--bootstrap-show-splash ()
+  "Display centered bootstrap splash screen."
+  (when iota--bootstrap-needed-p
+    ;; Create or switch to bootstrap buffer
+    (setq iota--bootstrap-buffer (get-buffer-create "*iota-bootstrap*"))
+    (switch-to-buffer iota--bootstrap-buffer)
+    (buffer-disable-undo)
+    (setq-local mode-line-format nil)
+    (setq-local header-line-format nil)
+    (setq-local cursor-type nil)
+    (setq buffer-read-only nil)
+    (iota--bootstrap-update-splash "Initializing...")))
+
+(defun iota--bootstrap-update-splash (message)
+  "Update the bootstrap splash with MESSAGE."
+  (setq iota--bootstrap-message message)
+  (when (buffer-live-p iota--bootstrap-buffer)
+    (with-current-buffer iota--bootstrap-buffer
+      (let ((inhibit-read-only t))
+        (erase-buffer)
+        (let* ((width (window-width))
+               (height (window-height))
+               ;; Main title
+               (title "ι • ο • τ • α")
+               (title-len (length title))
+               ;; Installation line
+               (install-prefix "Installing ")
+               (install-line (concat install-prefix message))
+               (install-len (length install-line))
+               ;; Calculate centering
+               (vertical-padding (/ (- height 4) 2))
+               (title-padding (max 0 (/ (- width title-len) 2)))
+               (install-padding (max 0 (/ (- width install-len) 2))))
+          ;; Vertical centering
+          (dotimes (_ vertical-padding)
+            (insert "\n"))
+          ;; Title line
+          (insert (make-string title-padding ?\s))
+          (insert (propertize title 'face '(:weight bold :height 1.3)))
+          (insert "\n\n")
+          ;; Installation status line
+          (insert (make-string install-padding ?\s))
+          (insert (propertize install-prefix 'face 'font-lock-comment-face))
+          (insert (propertize message 'face '(:slant italic))))
+        (goto-char (point-min)))
+      (redisplay t))))
+
+(defun iota--bootstrap-teardown ()
+  "Clean up bootstrap splash after installation completes."
+  (when (buffer-live-p iota--bootstrap-buffer)
+    (kill-buffer iota--bootstrap-buffer))
+  (setq iota--bootstrap-buffer nil))
+
+;; Show splash immediately if bootstrap needed
+(when iota--bootstrap-needed-p
+  (iota--bootstrap-show-splash))
+
+;; ============================================================================
+;; Path Configuration
+;; ============================================================================
+
 ;; Use iota- prefix with organized subdirectories (must be set before package-initialize)
 (setq custom-file (locate-user-emacs-file "iota-config/custom.el"))
 (setq package-user-dir (locate-user-emacs-file "iota-packages/elpa"))
@@ -44,6 +146,17 @@
 (setq denote-directory (locate-user-emacs-file "iota-data/silo"))
 (setopt use-short-answers t)
 
+;; Suppress all interactive prompts during bootstrap
+(when iota--bootstrap-needed-p
+  ;; Auto-confirm VC package checkouts
+  (setq package-vc-allow-side-effects t)
+  ;; Named functions for advice (so they can be removed later)
+  (defun iota--bootstrap-always-yes (&rest _) "Auto-confirm for bootstrap." t)
+  ;; Suppress y-or-n queries during package installation
+  (advice-add 'y-or-n-p :override #'iota--bootstrap-always-yes)
+  (advice-add 'yes-or-no-p :override #'iota--bootstrap-always-yes))
+
+
 ;; Initialize package system
 (require 'package)
 (add-to-list 'package-archives '("gnu" . "https://elpa.gnu.org/packages/") t)
@@ -52,10 +165,28 @@
 (setq package-install-upgrade-built-in t)
 (package-initialize)
 
+;; Refresh package archives during bootstrap (after package-initialize)
+(when iota--bootstrap-needed-p
+  (iota--bootstrap-update-splash "package archives...")
+  (package-refresh-contents))
+
 ;; Setup use-package
 (require 'use-package)
 (setq use-package-always-ensure t)
 (setq use-package-verbose t) ; Show more details for debugging
+
+;; Hook into use-package to update bootstrap splash
+(when iota--bootstrap-needed-p
+  (defun iota--bootstrap-advice-use-package (orig-fn name &rest args)
+    "Advice to update bootstrap splash when processing a package."
+    (iota--bootstrap-update-splash (symbol-name name))
+    (apply orig-fn name args))
+  (advice-add 'use-package :around #'iota--bootstrap-advice-use-package)
+  ;; Remove advice after init
+  (add-hook 'after-init-hook
+            (lambda ()
+              (advice-remove 'use-package #'iota--bootstrap-advice-use-package))
+            89))
 
 ;; Essential keybinding infrastructure
 (use-package general
@@ -789,24 +920,46 @@
          :rev :newest
          :branch "main")
     :defer t
-    :defines (copilot-completion-map copilot-disable-predicates)
-    :functions (copilot-mode)
+    :defines (copilot-completion-map copilot-disable-predicates copilot--connection)
+    :functions (copilot-mode copilot-installed-version)
     :custom
     (copilot-idle-delay 0.2)
     (copilot-indent-offset-warning-disable t)
     (copilot-install-dir (locate-user-emacs-file "iota-cache/copilot"))
     :init
+    (defun iota/copilot-installed-p ()
+      "Check if copilot language server is installed."
+      (and (fboundp 'copilot-installed-version)
+           (condition-case nil
+               (copilot-installed-version)
+             (error nil))))
+    
     ;; Add hook with error handling to prevent bootstrap failures
     (defun iota/enable-copilot-maybe ()
-      "Enable copilot-mode if available, with error handling."
+      "Enable copilot-mode if available and language server is installed.
+Skips during bootstrap and if language server is not installed."
       (when (and (fboundp 'copilot-mode)
-                 (not (bound-and-true-p copilot-mode)))
-        (condition-case err
+                 (not (bound-and-true-p copilot-mode))
+                 ;; Skip during bootstrap
+                 (not (bound-and-true-p iota--bootstrap-needed-p))
+                 ;; Only enable if language server is installed
+                 (iota/copilot-installed-p))
+        (condition-case nil
             (copilot-mode 1)
-          (error (message "Copilot activation failed: %s" err)))))
+          (error nil))))  ; Silently ignore errors
 
     (add-hook 'prog-mode-hook #'iota/enable-copilot-maybe)
     :config
+    ;; Suppress copilot warning messages
+    (defun iota/copilot-suppress-warnings (orig-fun &rest args)
+      "Suppress copilot warning messages about missing language server."
+      (let ((inhibit-message t))
+        (apply orig-fun args)))
+    
+    ;; Advice copilot functions that produce warnings
+    (when (fboundp 'copilot--start-agent)
+      (advice-add 'copilot--start-agent :around #'iota/copilot-suppress-warnings))
+    
     ;; Keybindings - only set if the map exists
     (when (boundp 'copilot-completion-map)
       (define-key copilot-completion-map (kbd "<tab>") 'copilot-accept-completion)
@@ -1048,7 +1201,29 @@ If a header already exists, update it. Otherwise, insert a new one."
   (iota-modeline-mode 1) ;; automatic in iota
   (iota-popup-mode 1)
   (iota-dimmer-mode 1)
-  (iota-window-mode 1) ;; automatic in iota
+  (iota-window-mode 1)
+  
+  ;; Show splash screen at startup (only when not bootstrapping)
+  (unless (bound-and-true-p iota--bootstrap-needed-p)
+    (add-hook 'emacs-startup-hook #'iota-splash-screen)))
 
-  :hook
-  (emacs-startup-hook . iota-splash-screen))
+;;; ============================================================================
+;;; Bootstrap Finalization (MUST BE LAST)
+;;; ============================================================================
+
+(when iota--bootstrap-needed-p
+  ;; Remove prompt suppression
+  (when (fboundp 'iota--bootstrap-always-yes)
+    (advice-remove 'y-or-n-p #'iota--bootstrap-always-yes)
+    (advice-remove 'yes-or-no-p #'iota--bootstrap-always-yes))
+  ;; Teardown bootstrap splash buffer
+  (iota--bootstrap-teardown)
+  ;; Reset bootstrap flag
+  (setq iota--bootstrap-needed-p nil)
+  ;; Schedule splash screen after frame is fully set up
+  (add-hook 'window-setup-hook
+            (lambda ()
+              ;; Force=t bypasses file-buffer check (custom.el may be open)
+              (iota-splash-screen t))))
+
+;;; init.el ends here
