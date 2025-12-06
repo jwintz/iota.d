@@ -885,151 +885,39 @@ Generate ONLY the commit message, no explanations:" diff)))
   :config
   ;; You may need to run M-x gptel-gh-login to authenticate
   (setq gptel-backend (gptel-make-gh-copilot "Copilot"))
-  (setq gptel-model 'claude-sonnet-4.5)
+  (setq gptel-model 'claude-sonnet-4.5))
 
-  ;; Tool definitions using gptel-make-tool
-  (gptel-make-tool
-   :name "edit_buffer"
-   :description "Edit the current buffer by replacing text. Use for search-and-replace operations."
-   :function (lambda (search replace)
-               (let ((case-fold-search nil))  ; Case-sensitive search
-                 (message "[gptel-tool] edit_buffer called with search='%s' replace='%s'" search replace)
-                 (save-excursion
-                   (goto-char (point-min))
-                   (if (search-forward search nil t)
-                       (progn
-                         (replace-match replace t t)  ; literal replacement
-                         (message "[gptel-tool] Replacement successful")
-                         (format "✓ Replaced text successfully"))
-                     (message "[gptel-tool] Text not found")
-                     (format "✗ Text not found. Buffer size: %d chars. Search string length: %d"
-                             (buffer-size) (length search))))))
-   :args (list '(:name "search"
-                 :type string
-                 :description "Exact text to search for (case-sensitive)")
-               '(:name "replace"
-                 :type string
-                 :description "Text to replace with")))
+;; llm-tool-collection for gptel
+;; Install via package-vc if not available
+(unless (package-installed-p 'llm-tool-collection)
+  (package-vc-install '(llm-tool-collection :url "https://github.com/skissue/llm-tool-collection"
+                                            :branch "main")))
 
-  (gptel-make-tool
-   :name "insert_at_position"
-   :description "Insert text at a specific position in the buffer. Use 'start' for beginning, 'end' for end, or a line number."
-   :function (lambda (position text)
-               (message "[gptel-tool] insert_at_position called with position='%s'" position)
-               (save-excursion
-                 (cond
-                  ((string= position "start")
-                   (goto-char (point-min))
-                   (insert text)
-                   (format "✓ Inserted %d chars at start of buffer" (length text)))
-                  ((string= position "end")
-                   (goto-char (point-max))
-                   (insert text)
-                   (format "✓ Inserted %d chars at end of buffer" (length text)))
-                  ((string-match "^[0-9]+$" position)
-                   (let ((line-num (string-to-number position)))
-                     (goto-char (point-min))
-                     (forward-line (1- line-num))
-                     (insert text)
-                     (format "✓ Inserted %d chars at line %d" (length text) line-num)))
-                  (t (format "✗ Invalid position: %s. Use 'start', 'end', or a line number" position)))))
-   :args (list '(:name "position"
-                 :type string
-                 :description "Where to insert: 'start', 'end', or a line number")
-               '(:name "text"
-                 :type string
-                 :description "Text to insert")))
+(with-eval-after-load 'gptel
+  (require 'llm-tool-collection)
 
-  (gptel-make-tool
-   :name "read_buffer_region"
-   :description "Read a portion of the current buffer. Use to check content before editing."
-   :function (lambda (start-pos end-pos)
-               (message "[gptel-tool] read_buffer_region called with start='%s' end='%s'" start-pos end-pos)
-               (let ((start (cond
-                             ((string= start-pos "start") (point-min))
-                             ((string-match "^[0-9]+$" start-pos)
-                              (save-excursion
-                                (goto-char (point-min))
-                                (forward-line (1- (string-to-number start-pos)))
-                                (point)))
-                             (t (point-min))))
-                     (end (cond
-                           ((string= end-pos "end") (point-max))
-                           ((string-match "^[0-9]+$" end-pos)
-                            (save-excursion
-                              (goto-char (point-min))
-                              (forward-line (string-to-number end-pos))
-                              (point)))
-                           (t (point-max)))))
-                 (let ((content (buffer-substring-no-properties start end)))
-                   (format "Content (%d chars):\n%s" (length content) content))))
-   :args (list '(:name "start_pos"
-                 :type string
-                 :description "Start position: 'start' or line number")
-               '(:name "end_pos"
-                 :type string
-                 :description "End position: 'end' or line number")))
+  ;; Define custom tool
+  (defvar iota--gptel-project-info-tool
+    (gptel-make-tool
+     :name "get_project_info"
+     :description "Get information about the current project including root directory and current file"
+     :function (lambda ()
+                 (let ((project (project-current)))
+                   (if project
+                       (format "Project root: %s\nCurrent file: %s"
+                               (project-root project)
+                               (or buffer-file-name "no file"))
+                     "No project found")))
+     :args nil))
 
-  (gptel-make-tool
-   :name "create_file"
-   :description "Create a new file with content, optionally in current project"
-   :function (lambda (filename content)
-               (let* ((project (project-current))
-                      (filepath (if (and project (not (file-name-absolute-p filename)))
-                                    (expand-file-name filename (project-root project))
-                                  (expand-file-name filename))))
-                 (condition-case err
-                     (progn
-                       (make-directory (file-name-directory filepath) t)
-                       (with-temp-file filepath
-                         (insert content))
-                       (find-file filepath)
-                       (format "Created file: %s" filepath))
-                   (error (format "Failed to create file: %s" (error-message-string err))))))
-   :args (list '(:name "filename"
-                 :type string
-                 :description "File path relative to project root or absolute")
-               '(:name "content"
-                 :type string
-                 :description "File content")))
-
-  (gptel-make-tool
-   :name "get_project_info"
-   :description "Get information about the current project including root directory and current file"
-   :function (lambda ()
-               (let ((project (project-current)))
-                 (if project
-                     (format "Project root: %s\nCurrent file: %s"
-                             (project-root project)
-                             (or buffer-file-name "no file"))
-                   "No project found")))
-   :args nil)
-
-  (gptel-make-tool
-   :name "list_project_files"
-   :description "List files in the current project matching a glob pattern (e.g., '*.el', '**/*.py')"
-   :function (lambda (pattern)
-               (let ((project (project-current)))
-                 (if project
-                     (let* ((root (project-root project))
-                            (files (project-files project))
-                            (matches (seq-filter
-                                      (lambda (f)
-                                        (string-match-p
-                                         (wildcard-to-regexp pattern)
-                                         (file-relative-name f root)))
-                                      files)))
-                       (if matches
-                           (mapconcat (lambda (f) (file-relative-name f root))
-                                      matches "\n")
-                         (format "No files matching '%s'" pattern)))
-                   "No project found")))
-   :args (list '(:name "pattern"
-                 :type string
-                 :description "Glob pattern to match files against")))
-
-  ;; Set the tools to use
-  (setq gptel-tools (gptel-get-tool "misc")))
+  ;; Combine llm-tool-collection tools with custom get_project_info
+  (setq gptel-tools
+        (append
+         ;; All tools from llm-tool-collection
+         (mapcar (apply-partially #'apply #'gptel-make-tool)
+                 (llm-tool-collection-get-all))
+         ;; Add custom get_project_info tool
+         (list iota--gptel-project-info-tool))))
 
 ;; Copilot configuration with robust error handling
 ;; Wrapped in with-demoted-errors to prevent bootstrap failures
