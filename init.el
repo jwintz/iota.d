@@ -464,6 +464,8 @@
    "" '(:ignore t :which-key "consult")
    "b" 'consult-buffer
    "f" 'consult-find
+   "r" 'consult-recent-file
+   "p" 'consult-project-buffer
    "g" 'consult-grep
    "s" 'consult-ripgrep
    "l" 'consult-line
@@ -741,7 +743,35 @@ Generate ONLY the commit message, no explanations:" diff)))
 (use-package project
   :demand t
   :general
-  ("C-c p" '(:keymap project-prefix-map :which-key "project")))
+  ("C-c p" '(:keymap project-prefix-map :which-key "project"))
+  :custom
+  ;; Automatically remember projects
+  (project-vc-merge-submodules nil)
+  ;; Use magit instead of vc-dir when switching projects
+  (project-switch-commands
+   '((project-find-file "Find file" ?f)
+     (project-find-regexp "Find regexp" ?g)
+     (project-find-dir "Find directory" ?d)
+     (project-vc-dir "VC-Dir" ?v)
+     (project-shell "Shell" ?s)))
+  :config
+  ;; Replace vc-dir with magit-status
+  (defun iota--project-magit-status ()
+    "Run magit-status in the current project root."
+    (interactive)
+    (magit-status (project-root (project-current t))))
+  (setq project-switch-commands
+        '((project-find-file "Find file" ?f)
+          (project-find-regexp "Find regexp" ?g)
+          (project-find-dir "Find directory" ?d)
+          (iota--project-magit-status "Magit" ?v)
+          (project-shell "Shell" ?s)))
+  ;; Automatically register projects when opening files
+  (defun iota--project-remember-auto ()
+    "Automatically remember project when opening a file in a git repo."
+    (when-let ((project (project-current)))
+      (project-remember-project project)))
+  (add-hook 'find-file-hook #'iota--project-remember-auto))
 
 ;;; ============================================================================
 ;;; File Types & Markup
