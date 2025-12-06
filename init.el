@@ -1110,6 +1110,42 @@ Skips during bootstrap and if language server is not installed."
   ;; Performance
   (doom-modeline-checker-simple-format t))
 
+;; Customize god-mode icon in modeline
+;; Must be done before doom-modeline-segments loads (defsubst gets inlined)
+(with-eval-after-load 'doom-modeline-core
+  (defun doom-modeline--god ()
+    "The current god state which is enabled by the command `god-mode'."
+    (when (bound-and-true-p god-local-mode)
+      (doom-modeline--modal-icon
+       "<G>" 'doom-modeline-god "God mode"
+       "nf-md-keyboard_outline" "🅖"))))
+
+;; Force recompilation of modals segment after our override
+(with-eval-after-load 'doom-modeline-segments
+  (doom-modeline-def-segment modals
+    "Displays modal editing states.
+
+Including `evil', `overwrite', `god', `ryo' and `xha-fly-kyes', etc."
+    (when doom-modeline-modal
+      (let* ((evil (doom-modeline--evil))
+             (ow (doom-modeline--overwrite))
+             (god (doom-modeline--god))
+             (ryo (doom-modeline--ryo))
+             (xf (doom-modeline--xah-fly-keys))
+             (boon (doom-modeline--boon))
+             (meow (doom-modeline--meow))
+             (vsep (doom-modeline-vspc))
+             (sep (and (or evil ow god ryo xf boon meow) (doom-modeline-spc))))
+        (concat sep
+                (and evil (concat evil (and (or ow god ryo xf boon meow) vsep)))
+                (and ow (concat ow (and (or god ryo xf boon meow) vsep)))
+                (and god (concat god (and (or ryo xf boon meow) vsep)))
+                (and ryo (concat ryo (and (or xf boon meow) vsep)))
+                (and xf (concat xf (and (or boon meow) vsep)))
+                (and boon (concat boon (and meow vsep)))
+                meow
+                sep)))))
+
 ;; Customize Copilot buffer icon
 (with-eval-after-load 'nerd-icons
   ;; Add copilot icon for buffers named *Copilot*
