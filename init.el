@@ -179,7 +179,7 @@
 (setq transient-history-file (locate-user-emacs-file "iota-data/transient/history.el"))
 (setq transient-levels-file (locate-user-emacs-file "iota-data/transient/levels.el"))
 (setq transient-values-file (locate-user-emacs-file "iota-data/transient/values.el"))
-(setq eshell-directory-history (locate-user-emacs-file "iota-data/eshell/"))
+(setq eshell-directory-name (locate-user-emacs-file "iota-data/eshell"))
 (setq recentf-save-file (locate-user-emacs-file "iota-data/recentf"))
 (setq save-place-file (locate-user-emacs-file "iota-data/places"))
 (setq denote-directory (locate-user-emacs-file "iota-data/silo"))
@@ -542,6 +542,66 @@
   (global-auto-revert-non-file-buffers t)
   (auto-revert-interval 3)
   (auto-revert-verbose t))
+
+;;; ============================================================================
+;;; Terminal Emulation
+;;; ============================================================================
+
+(use-package eat
+  :ensure t
+  :general
+  (:prefix "C-c s"
+   "" '(:ignore t :which-key "shell")
+   "s" 'eat
+   "p" 'eat-project
+   "e" 'eat-eshell-mode
+   "v" 'eat-eshell-visual-command-mode)
+  :custom
+  ;; For `eat-eshell-mode'
+  (eat-enable-directory-tracking t)
+  (eat-enable-shell-prompt-annotation t)
+  ;; Set the correct terminal type
+  (eat-term-name "xterm-256color")
+  ;; Kill the terminal process when the buffer is killed
+  (eat-kill-process-on-exit t)
+  :config
+  ;; CRITICAL: Disable god-mode in eat buffers to prevent keystroke duplication
+  (add-hook 'eat-mode-hook
+            (lambda ()
+              (when (fboundp 'god-local-mode)
+                (god-local-mode -1))))
+
+  ;; Fix window glitches after splits/resizes
+  (add-hook 'eat-mode-hook
+            (lambda ()
+              ;; Force redisplay after window configuration changes
+              (add-hook 'window-configuration-change-hook
+                        (lambda ()
+                          (when (and (eq major-mode 'eat-mode)
+                                     (get-buffer-window (current-buffer)))
+                            ;; Redraw just this window, not the whole display
+                            (force-window-update (current-buffer))
+                            (redisplay t)))
+                        nil t)))
+
+  ;; Fix backspace in semi-char-mode while keeping Emacs keybindings (C-x, M-x, etc.)
+  ;; Semi-char mode should be the default - it reserves C-x, C-c, M-x for Emacs
+  (with-eval-after-load 'eat
+    ;; Make backspace work in semi-char-mode by binding it explicitly
+    (when (boundp 'eat-semi-char-mode-map)
+      (define-key eat-semi-char-mode-map (kbd "DEL") 'eat-self-input)
+      (define-key eat-semi-char-mode-map (kbd "<backspace>") 'eat-self-input)
+      (define-key eat-semi-char-mode-map (kbd "C-?") 'eat-self-input)
+
+      ;; Mode toggle keybindings
+      (define-key eat-semi-char-mode-map (kbd "C-c C-k") 'eat-char-mode))
+
+    (when (boundp 'eat-mode-map)
+      (define-key eat-mode-map (kbd "C-c C-j") 'eat-semi-char-mode)))
+
+  ;; Enable eat integration with eshell
+  (add-hook 'eshell-load-hook #'eat-eshell-mode)
+  (add-hook 'eshell-load-hook #'eat-eshell-visual-command-mode))
 
 ;;; ============================================================================
 ;;; History & Persistence
