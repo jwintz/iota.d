@@ -67,10 +67,21 @@
 ;; Bootstrap splash screen state
 (defvar iota--bootstrap-buffer nil "Buffer used for bootstrap splash.")
 (defvar iota--bootstrap-message "" "Current installation message.")
+(defvar iota--bootstrap-saved-cursor-type nil "Saved cursor type before bootstrap.")
+(defvar iota--bootstrap-saved-cursor-in-non-selected nil "Saved cursor in non-selected windows.")
+(defvar iota--bootstrap-saved-visible-cursor nil "Saved visible-cursor.")
 
 (defun iota--bootstrap-show-splash ()
   "Display centered bootstrap splash screen."
   (when iota--bootstrap-needed-p
+    ;; Save current cursor state globally
+    (setq iota--bootstrap-saved-cursor-type cursor-type)
+    (setq iota--bootstrap-saved-cursor-in-non-selected cursor-in-non-selected-windows)
+    (setq iota--bootstrap-saved-visible-cursor visible-cursor)
+    ;; Hide cursor globally
+    (setq cursor-type nil)
+    (setq cursor-in-non-selected-windows nil)
+    (setq visible-cursor nil)
     ;; Create or switch to bootstrap buffer
     (setq iota--bootstrap-buffer (get-buffer-create "*iota-bootstrap*"))
     (switch-to-buffer iota--bootstrap-buffer)
@@ -78,6 +89,12 @@
     (setq-local mode-line-format nil)
     (setq-local header-line-format nil)
     (setq-local cursor-type nil)
+    (setq-local cursor-in-non-selected-windows nil)
+    (setq-local visible-cursor nil)
+    ;; Move point to beginning
+    (goto-char (point-min))
+    ;; Hide cursor at window level (most reliable method)
+    (internal-show-cursor (selected-window) nil)
     (setq buffer-read-only nil)
     (iota--bootstrap-update-splash "Initializing...")))
 
@@ -86,7 +103,8 @@
   (setq iota--bootstrap-message message)
   (when (buffer-live-p iota--bootstrap-buffer)
     (with-current-buffer iota--bootstrap-buffer
-      (let ((inhibit-read-only t))
+      (let ((inhibit-read-only t)
+            (window (get-buffer-window iota--bootstrap-buffer)))
         (erase-buffer)
         (let* ((width (window-width))
                (height (window-height))
@@ -112,14 +130,35 @@
           (insert (make-string install-padding ?\s))
           (insert (propertize install-prefix 'face 'font-lock-comment-face))
           (insert (propertize message 'face '(:slant italic))))
-        (goto-char (point-min)))
+        ;; Ensure cursor remains hidden after redraw
+        (setq-local cursor-type nil)
+        (setq-local cursor-in-non-selected-windows nil)
+        (setq-local visible-cursor nil)
+        ;; Move point to beginning
+        (goto-char (point-min))
+        ;; Hide cursor at window level (most reliable method)
+        (when window
+          (internal-show-cursor window nil)))
       (redisplay t))))
 
 (defun iota--bootstrap-teardown ()
   "Clean up bootstrap splash after installation completes."
   (when (buffer-live-p iota--bootstrap-buffer)
+    (let ((window (get-buffer-window iota--bootstrap-buffer)))
+      ;; Restore cursor at window level
+      (when window
+        (internal-show-cursor window t)))
     (kill-buffer iota--bootstrap-buffer))
-  (setq iota--bootstrap-buffer nil))
+  (setq iota--bootstrap-buffer nil)
+  ;; Restore all cursor settings
+  (when iota--bootstrap-saved-cursor-type
+    (setq cursor-type iota--bootstrap-saved-cursor-type))
+  (when iota--bootstrap-saved-cursor-in-non-selected
+    (setq cursor-in-non-selected-windows iota--bootstrap-saved-cursor-in-non-selected))
+  (when iota--bootstrap-saved-visible-cursor
+    (setq visible-cursor iota--bootstrap-saved-visible-cursor))
+  ;; Ensure cursor is shown in selected window
+  (internal-show-cursor (selected-window) t))
 
 ;; Show splash immediately if bootstrap needed
 (when iota--bootstrap-needed-p
@@ -984,7 +1023,7 @@ Generate ONLY the commit message, no explanations:" diff)))
            (condition-case nil
                (copilot-installed-version)
              (error nil))))
-    
+
     ;; Add hook with error handling to prevent bootstrap failures
     (defun iota/enable-copilot-maybe ()
       "Enable copilot-mode if available and language server is installed.
@@ -1006,11 +1045,11 @@ Skips during bootstrap and if language server is not installed."
       "Suppress copilot warning messages about missing language server."
       (let ((inhibit-message t))
         (apply orig-fun args)))
-    
+
     ;; Advice copilot functions that produce warnings
     (when (fboundp 'copilot--start-agent)
       (advice-add 'copilot--start-agent :around #'iota/copilot-suppress-warnings))
-    
+
     ;; Keybindings - only set if the map exists
     (when (boundp 'copilot-completion-map)
       (define-key copilot-completion-map (kbd "<tab>") 'copilot-accept-completion)
@@ -1092,10 +1131,11 @@ Skips during bootstrap and if language server is not installed."
  "r" 'iota/load-random-dark-theme
  "R" 'iota/load-random-light-theme)
 
-;; Load a random dark theme at startup (after init completes)
-(add-hook 'after-init-hook #'iota/load-random-dark-theme)
-
-;; me-likey themes:
+;; Load random theme at startup (after init completes)
+;; (add-hook 'after-init-hook #'iota/load-random-dark-theme)
+;; ... or a specific one
+(add-hook 'after-init-hook (lambda () (load-theme 'doric-dark t)))
+;; ... me-likey themes:
 ;; - doric-dark
 ;; - doric-obsidian
 
@@ -1253,7 +1293,7 @@ If a header already exists, update it. Otherwise, insert a new one."
   (iota-popup-mode 1)
   (iota-dimmer-mode 1)
   (iota-window-mode 1)
-  
+
   ;; Show splash screen at startup (only when not bootstrapping)
   (unless (bound-and-true-p iota--bootstrap-needed-p)
     (add-hook 'emacs-startup-hook #'iota-splash-screen)))
