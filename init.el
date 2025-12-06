@@ -1110,6 +1110,19 @@ Skips during bootstrap and if language server is not installed."
   ;; Performance
   (doom-modeline-checker-simple-format t))
 
+;; Customize Copilot buffer icon
+(with-eval-after-load 'nerd-icons
+  ;; Add copilot icon for buffers named *Copilot*
+  (add-to-list 'nerd-icons-regexp-icon-alist
+               '("^\\*Copilot\\*$" nerd-icons-codicon "nf-cod-copilot" :face nerd-icons-blue)))
+
+;; Hook to set copilot icon in modeline for *Copilot* buffer
+(add-hook 'markdown-mode-hook
+          (lambda ()
+            (when (string= (buffer-name) "*Copilot*")
+              (setq-local mode-name
+                          (concat (nerd-icons-codicon "nf-cod-copilot" :face 'nerd-icons-blue) " Copilot")))))
+
 ;;; ============================================================================
 ;;; Custom/Local Packages
 ;;; ============================================================================
