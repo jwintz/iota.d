@@ -565,24 +565,11 @@
   ;; Kill the terminal process when the buffer is killed
   (eat-kill-process-on-exit t)
   :config
-  ;; CRITICAL: Disable god-mode in eat buffers to prevent keystroke duplication
+  ;; Disable god-mode in eat buffers to prevent keystroke duplication
   (add-hook 'eat-mode-hook
             (lambda ()
               (when (fboundp 'god-local-mode)
                 (god-local-mode -1))))
-
-  ;; Fix window glitches after splits/resizes
-  (add-hook 'eat-mode-hook
-            (lambda ()
-              ;; Force redisplay after window configuration changes
-              (add-hook 'window-configuration-change-hook
-                        (lambda ()
-                          (when (and (eq major-mode 'eat-mode)
-                                     (get-buffer-window (current-buffer)))
-                            ;; Redraw just this window, not the whole display
-                            (force-window-update (current-buffer))
-                            (redisplay t)))
-                        nil t)))
 
   ;; Fix backspace in semi-char-mode while keeping Emacs keybindings (C-x, M-x, etc.)
   ;; Semi-char mode should be the default - it reserves C-x, C-c, M-x for Emacs
