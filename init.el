@@ -974,37 +974,25 @@ Generate ONLY the commit message, no explanations:" diff)))
     :vc (:url "https://github.com/copilot-emacs/copilot.el"
          :rev :newest
          :branch "main")
-    :defer t
     :defines (copilot-completion-map copilot-disable-predicates copilot--connection)
-    :functions (copilot-mode copilot-installed-version)
+    :functions (copilot-mode copilot-installed-version iota/enable-copilot-safely)
     :custom
     (copilot-idle-delay 0.2)
     (copilot-indent-offset-warning-disable t)
     (copilot-install-dir (locate-user-emacs-file "iota-cache/copilot"))
-    :init
-    (defun iota/copilot-installed-p ()
-      "Check if copilot language server is installed."
-      (and (fboundp 'copilot-installed-version)
-           (condition-case nil
-               (copilot-installed-version)
-             (error nil))))
-
-    ;; Add hook with error handling to prevent bootstrap failures
-    (defun iota/enable-copilot-maybe ()
-      "Enable copilot-mode if available and language server is installed.
-Skips during bootstrap and if language server is not installed."
-      (when (and (fboundp 'copilot-mode)
-                 (not (bound-and-true-p copilot-mode))
-                 ;; Skip during bootstrap
-                 (not (bound-and-true-p iota--bootstrap-needed-p))
-                 ;; Only enable if language server is installed
-                 (iota/copilot-installed-p))
-        (condition-case nil
-            (copilot-mode 1)
-          (error nil))))  ; Silently ignore errors
-
-    (add-hook 'prog-mode-hook #'iota/enable-copilot-maybe)
+    :hook ((prog-mode markdown-mode) . iota/enable-copilot-safely)
     :config
+    ;; Safe wrapper to enable copilot with proper checks
+    (defun iota/enable-copilot-safely ()
+      "Enable copilot-mode with bootstrap and installation checks.
+Only runs after package is loaded, so all copilot functions are available."
+      (when (and (not (bound-and-true-p copilot-mode))
+                 (not (bound-and-true-p iota--bootstrap-needed-p)))
+        (condition-case err
+            (when (and (fboundp 'copilot-installed-version)
+                       (copilot-installed-version))
+              (copilot-mode 1))
+          (error nil))))  ; Silently ignore errors during startup
     ;; Suppress copilot warning messages
     (defun iota/copilot-suppress-warnings (orig-fun &rest args)
       "Suppress copilot warning messages about missing language server."
