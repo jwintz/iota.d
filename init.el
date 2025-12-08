@@ -785,7 +785,10 @@ Generate ONLY the commit message, no explanations:" diff)))
 
   ;; Bind in git-commit-mode
   (with-eval-after-load 'git-commit
-    (define-key git-commit-mode-map (kbd "C-c C-g") #'iota/generate-commit-message)))
+    (define-key git-commit-mode-map (kbd "C-c C-g") #'iota/generate-commit-message))
+
+  ;; Auto-refresh magit status buffer on file save
+  (add-hook 'after-save-hook 'magit-after-save-refresh-status t))
 
 (use-package project
   :demand t
@@ -932,7 +935,10 @@ Generate ONLY the commit message, no explanations:" diff)))
   :config
   ;; You may need to run M-x gptel-gh-login to authenticate
   (setq gptel-backend (gptel-make-gh-copilot "Copilot"))
-  (setq gptel-model 'claude-sonnet-4.5))
+  (setq gptel-model 'gpt-5-mini)
+
+  ;; Auto-scroll to bottom on new messages
+  (add-hook 'gptel-post-stream-hook 'gptel-auto-scroll))
 
 ;; llm-tool-collection for gptel
 ;; Install via package-vc if not available
