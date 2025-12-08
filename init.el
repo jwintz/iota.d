@@ -847,15 +847,7 @@ Generate ONLY the commit message, no explanations:" diff)))
    "b" 'markdown-insert-bold
    "i" 'markdown-insert-italic
    "s" 'markdown-insert-strike-through
-   "q" 'markdown-insert-blockquote)
-  :init
-  (setq markdown-add-border t)
-  (setq markdown-header-scaling t)
-  (setq markdown-fontify-code-blocks-natively t)
-  :config
-  (set-face-attribute 'markdown-code-face nil :background 'unspecified)
-  (set-face-attribute 'markdown-pre-face nil :background 'unspecified :box t)
-  (set-face-attribute 'markdown-language-keyword-face nil :background 'unspecified))
+   "q" 'markdown-insert-blockquote))
 
 ;;; ============================================================================
 ;;; Knowledge Management
@@ -1303,9 +1295,10 @@ If a header already exists, update it. Otherwise, insert a new one."
 
   :config
   (iota-modeline-mode 1) ;; automatic in iota
-  (iota-popup-mode 1)
-  (iota-dimmer-mode 1)
-  (iota-window-mode 1)
+  (iota-modes-mode 1) 	 ;; automatic in iota
+  (iota-popup-mode 1)    ;; automatic in iota
+  (iota-dimmer-mode 1)   ;; *not* automatic in iota
+  (iota-window-mode 1)   ;; automatic in iota
 
   ;; Show splash screen at startup (only when not bootstrapping)
   (unless (bound-and-true-p iota--bootstrap-needed-p)
