@@ -850,7 +850,11 @@ Generate ONLY the commit message, no explanations:" diff)))
    "q" 'markdown-insert-blockquote)
   :init
   (setq markdown-add-border t)
-  (setq markdown-header-scaling t))
+  (setq markdown-header-scaling t)
+  :config
+  (set-face-attribute 'markdown-code-face nil :background 'unspecified)
+  (set-face-attribute 'markdown-pre-face nil :background 'unspecified)
+  (set-face-attribute 'markdown-language-keyword-face nil :background 'unspecified))
 
 ;;; ============================================================================
 ;;; Knowledge Management
