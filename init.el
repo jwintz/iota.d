@@ -402,7 +402,7 @@
 ;; Customize keycast faces - must be done after theme loads to override theme settings
 (defun iota/setup-keycast-faces ()
   "Configure keycast faces to use semantic face inheritance."
-  (set-face-attribute 'keycast-key nil 
+  (set-face-attribute 'keycast-key nil
                       :inherit 'font-lock-keyword-face
                       :weight 'bold
                       :foreground 'unspecified
@@ -931,8 +931,8 @@ Generate ONLY the commit message, no explanations:" diff)))
 (use-package gptel
   :ensure t
   :general
-  (:prefix "C-c a"
-   "" '(:ignore t :which-key "ai")
+  (:prefix "C-c g"
+   "" '(:ignore t :which-key "copilot")
    "g" 'gptel
    "s" 'gptel-send
    "m" 'gptel-menu)
@@ -946,6 +946,14 @@ Generate ONLY the commit message, no explanations:" diff)))
   ;; You may need to run M-x gptel-gh-login to authenticate
   (setq gptel-backend (gptel-make-gh-copilot "Copilot"))
   (setq gptel-model 'gpt-5-mini)
+
+  ;; -- genesis backend configuration --
+  ;; (setq gptel-backend (gptel-make-openai "Genesis"
+  ;;      :host "genesis.inria.fr:6666"
+  ;;      :stream t
+  ;;      :protocol "http"
+  ;;      :models '("mlx-community/Kimi-Dev-72B-4bit-DWQ")))
+  ;; (setq gptel-model "mlx-community/Kimi-Dev-72B-4bit-DWQ")
 
   ;; Auto-scroll to bottom on new messages
   (add-hook 'gptel-post-stream-hook 'gptel-auto-scroll))
