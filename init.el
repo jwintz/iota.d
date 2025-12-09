@@ -396,13 +396,26 @@
         (remove-hook 'pre-command-hook 'keycast--update)
         (setq global-mode-string (delete '("" keycast-mode-line " ") global-mode-string)))))
 
-  ;; Custom faces for better visibility
-  (custom-set-faces
-   '(keycast-command ((t (:inherit font-lock-keyword-face :height 0.9))))
-   '(keycast-key ((t (:inherit custom-modified :height 1.1 :weight bold)))))
-
   ;; Enable keycast-mode by default
   (keycast-mode 1))
+
+;; Customize keycast faces - must be done after theme loads to override theme settings
+(defun iota/setup-keycast-faces ()
+  "Configure keycast faces to use semantic face inheritance."
+  (set-face-attribute 'keycast-key nil 
+                      :inherit 'font-lock-keyword-face
+                      :weight 'bold
+                      :foreground 'unspecified
+                      :background 'unspecified
+                      :box nil)
+  (set-face-attribute 'keycast-command nil
+                      :inherit 'font-lock-builtin-face
+                      :foreground 'unspecified
+                      :background 'unspecified
+                      :box nil))
+
+;; Apply after theme loads
+(add-hook 'after-init-hook #'iota/setup-keycast-faces 90)
 
 ;;; ============================================================================
 ;;; Window & Buffer Management
@@ -1088,9 +1101,9 @@ Only runs after package is loaded, so all copilot functions are available."
  "R" 'iota/load-random-light-theme)
 
 ;; Load random theme at startup (after init completes)
-;; (add-hook 'after-init-hook #'iota/load-random-dark-theme)
+(add-hook 'after-init-hook #'iota/load-random-dark-theme)
 ;; ... or a specific one
-(add-hook 'after-init-hook (lambda () (load-theme 'doric-dark t)))
+;; (add-hook 'after-init-hook (lambda () (load-theme 'doric-dark t)))
 ;; ... me-likey themes:
 ;; - doric-dark
 ;; - doric-obsidian
