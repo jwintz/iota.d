@@ -1,3 +1,5 @@
+;;; -*- no-byte-compile: t; -*-
+
 ;; alias iota='emacs -nw --init-directory ~/Development/iota.d'
 
 ;;; ============================================================================
@@ -538,6 +540,20 @@
    :preview-key '(:debounce 0.4 any))
   (setq consult-narrow-key "<"))
 
+(use-package consult-gh
+  :ensure t
+  :after (consult embark)
+  :config
+  (setq consult-gh-default-clone-directory "~/Development")
+
+  (require 'consult-gh-transient)
+  (require 'consult-gh-embark)
+  (consult-gh-embark-mode +1))
+
+(autoload 'consult-gh-transient "consult-gh-transient" "GitHub interaction via Transient" t)
+
+;;  "g" 'consult-gh-transient)
+
 ;;; ============================================================================
 ;;; System Integration
 ;;; ============================================================================
@@ -720,10 +736,10 @@
    (yaml-ts-mode . outline-indent-minor-mode)
    (markdown-mode . outline-indent-minor-mode)))
 
-(use-package paredit
-  :hook (emacs-lisp-mode . paredit-mode)
-  :config
-  (define-key paredit-mode-map (kbd "RET") nil))
+;; (use-package paredit
+;;   :hook (emacs-lisp-mode . paredit-mode)
+;;   :config
+;;   (define-key paredit-mode-map (kbd "RET") nil))
 
 (use-package highlight-defined
   :hook (emacs-lisp-mode . highlight-defined-mode))
@@ -736,7 +752,7 @@
   :defer t
   :general
   (:prefix "C-c v"
-   "" '(:ignore t :which-key "magit")
+   "" '(:ignore t :which-key "version")
    "v" 'magit-status
    "l" 'magit-log-current
    "b" 'magit-blame
@@ -744,7 +760,8 @@
    "s" 'magit-stage-file
    "c" 'magit-commit
    "p" 'magit-push
-   "P" 'magit-pull)
+   "P" 'magit-pull
+   "g" 'consult-gh-transient)
   :config
   (setq magit-display-buffer-function
         (lambda (buffer) (display-buffer buffer '(display-buffer-same-window))))
