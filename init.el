@@ -568,7 +568,7 @@
   :ensure nil
   :init (global-auto-revert-mode 1)
   :custom
-  (global-auto-revert-non-file-buffers t)
+  (global-auto-revert-non-file-buffers nil)
   (auto-revert-interval 3)
   (auto-revert-verbose t))
 
