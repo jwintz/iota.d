@@ -1083,6 +1083,15 @@ Only runs after package is loaded, so all copilot functions are available."
   ;; Include Ef themes (and other derivatives) in Modus commands
   (modus-themes-include-derivatives-mode 1))
 
+(use-package kaolin-themes
+  :ensure t
+  :defer t
+  :config
+  (setq kaolin-themes-bold t
+	kaolin-themes-italic t
+	kaolin-themes-underline t
+	kaolin-themes-italic-comments t))
+
 (defun iota/load-random-dark-theme ()
   "Load a random dark theme from Modus, Ef, or Doric collections."
   (interactive)
