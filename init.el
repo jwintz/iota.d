@@ -657,6 +657,61 @@
 ;;; Editing Enhancements
 ;;; ============================================================================
 
+(use-package olivetti
+  :ensure t
+  :general
+  (:prefix "C-c o"
+   "" '(:ignore t :which-key "olivetti")
+   "o" 'olivetti-mode
+   "w" 'olivetti-set-width
+   "+" 'olivetti-expand
+   "-" 'olivetti-shrink)
+  :custom
+  ;; Use margins by default (works best in terminal)
+  (olivetti-style nil)
+  ;; Set comfortable default width for prose
+  (olivetti-body-width 80)
+  ;; Minimum width to prevent too-narrow columns
+  (olivetti-minimum-body-width 50)
+  ;; Clean mode-line indicator
+  (olivetti-lighter " ○")
+  ;; Remember visual-line-mode state
+  (olivetti-recall-visual-line-mode-entry-state t)
+  ;; :hook
+  ;; Auto-enable for writing modes
+  ;; ((markdown-mode org-mode text-mode) . olivetti-mode)
+  :config
+  ;; Terminal-specific optimizations
+  (unless (display-graphic-p)
+    ;; Force margin-based centering in terminal
+    (setq olivetti-style nil)
+    ;; Adjust for typical terminal width (80-120 cols)
+    (when (< (frame-width) 120)
+      (setq-default olivetti-body-width 0.85)))
+
+  ;; Helper function for quick width adjustments
+  (defun iota/olivetti-set-width-preset (preset)
+    "Set olivetti width to PRESET value.
+PRESET can be:
+  narrow  - 60 columns (for focused editing)
+  default - 80 columns (standard text width)
+  wide    - 100 columns (code/wide content)
+  full    - 0.9 fraction (nearly full window)"
+    (interactive
+     (list (intern (completing-read "Width preset: "
+                                    '(narrow default wide full)
+                                    nil t))))
+    (pcase preset
+      ('narrow  (olivetti-set-width 60))
+      ('default (olivetti-set-width 80))
+      ('wide    (olivetti-set-width 100))
+      ('full    (olivetti-set-width 0.9))))
+
+  ;; Add preset to keybindings
+  (general-define-key
+   :prefix "C-c o"
+   "p" '(iota/olivetti-set-width-preset :which-key "preset width")))
+
 (use-package completion-preview
   :ensure nil
   :hook (after-init . global-completion-preview-mode)
