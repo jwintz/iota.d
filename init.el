@@ -546,13 +546,9 @@
   :config
   (setq consult-gh-default-clone-directory "~/Development")
 
-  (require 'consult-gh-transient)
-  (require 'consult-gh-embark)
-  (consult-gh-embark-mode +1))
+  (require 'consult-gh-transient))
 
 (autoload 'consult-gh-transient "consult-gh-transient" "GitHub interaction via Transient" t)
-
-;;  "g" 'consult-gh-transient)
 
 ;;; ============================================================================
 ;;; System Integration
