@@ -987,9 +987,10 @@ Generate ONLY the commit message, no explanations:" diff)))
   :ensure t
   :after denote
   :config
-  (setq denote-file-type 'markdown-yaml)
+  (setq denote-file-type 'markdown-obsidian)
   (setq denote-org-store-link-to-heading nil)
   (setq denote-link-button-action 'find-file)
+  ;; Enable Markdown wiki links for better Obsidian compatibility
   (setq markdown-enable-wiki-links t)
   (setq markdown-wiki-link-search-type '(project)))
 
