@@ -184,6 +184,7 @@
 (setq eshell-directory-name (locate-user-emacs-file "iota-data/eshell"))
 (setq recentf-save-file (locate-user-emacs-file "iota-data/recentf"))
 (setq save-place-file (locate-user-emacs-file "iota-data/places"))
+(setq bookmark-default-file (locate-user-emacs-file "iota-data/bookmarks"))
 (setq denote-directory (locate-user-emacs-file "iota-data/silo"))
 (setopt use-short-answers t)
 
@@ -1039,6 +1040,14 @@ Only runs after package is loaded, so all copilot functions are available."
     ;; Advice copilot functions that produce warnings
     (when (fboundp 'copilot--start-agent)
       (advice-add 'copilot--start-agent :around #'iota/copilot-suppress-warnings))
+
+    ;; Redirect copilot stderr to a file in iota-tmp
+    (defun iota/copilot-redirect-stderr (orig-fun &rest args)
+      "Redirect copilot server stderr to a file."
+      (if (string= (plist-get args :name) "copilot server")
+          (apply orig-fun (plist-put args :stderr (locate-user-emacs-file "iota-tmp/copilot-stderr")))
+        (apply orig-fun args)))
+    (advice-add 'make-process :around #'iota/copilot-redirect-stderr)
 
     ;; Keybindings - only set if the map exists
     (when (boundp 'copilot-completion-map)
