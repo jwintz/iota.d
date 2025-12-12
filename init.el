@@ -1197,12 +1197,13 @@ Only runs after package is loaded, so all copilot functions are available."
  "R" 'iota/load-random-light-theme)
 
 ;; Load random theme at startup (after init completes)
-(add-hook 'after-init-hook #'iota/load-random-dark-theme)
+;; (add-hook 'after-init-hook #'iota/load-random-dark-theme)
 ;; ... or a specific one
-;; (add-hook 'after-init-hook (lambda () (load-theme 'doric-dark t)))
+(add-hook 'after-init-hook (lambda () (load-theme 'doric-pine t)))
 ;; ... me-likey themes:
 ;; - doric-dark
 ;; - doric-obsidian
+;; - doric-pine
 
 (use-package doom-modeline
   :ensure t
