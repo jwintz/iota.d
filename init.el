@@ -1100,9 +1100,10 @@ Only runs after package is loaded, so all copilot functions are available."
     ;; Redirect copilot stderr to a file in iota-tmp
     (defun iota/copilot-redirect-stderr (orig-fun &rest args)
       "Redirect copilot server stderr to a file."
-      (if (string= (plist-get args :name) "copilot server")
-          (apply orig-fun (plist-put args :stderr (locate-user-emacs-file "iota-tmp/copilot-stderr")))
-        (apply orig-fun args)))
+      (let ((stderr-file (locate-user-emacs-file "iota-tmp/copilot-stderr")))
+        (if (string= (plist-get args :name) "copilot server")
+            (apply orig-fun (plist-put args :stderr stderr-file))
+          (apply orig-fun args))))
     (advice-add 'make-process :around #'iota/copilot-redirect-stderr)
 
     ;; Keybindings - only set if the map exists
@@ -1411,6 +1412,22 @@ If a header already exists, update it. Otherwise, insert a new one."
   ;; Show splash screen at startup (only when not bootstrapping)
   (unless (bound-and-true-p iota--bootstrap-needed-p)
     (add-hook 'emacs-startup-hook #'iota-splash-screen)))
+
+;;; ============================================================================
+;;; Command-line Arguments
+;;; ============================================================================
+
+;; Register custom command-line option handler for --magit
+(defun iota/command-line-magit (switch)
+  "Handle --magit command-line switch to launch magit-status."
+  (add-hook 'emacs-startup-hook
+            (lambda ()
+              (if (project-current)
+                  (call-interactively 'magit-status)
+                (message "Not in a git repository")))
+            90))
+
+(add-to-list 'command-switch-alist '("--magit" . iota/command-line-magit))
 
 ;;; ============================================================================
 ;;; Bootstrap Finalization (MUST BE LAST)
