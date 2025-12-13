@@ -185,7 +185,7 @@
 (setq recentf-save-file (locate-user-emacs-file "iota-data/recentf"))
 (setq save-place-file (locate-user-emacs-file "iota-data/places"))
 (setq bookmark-default-file (locate-user-emacs-file "iota-data/bookmarks"))
-(setq denote-directory (locate-user-emacs-file "iota-data/silo"))
+(setq elgrep-data-file (locate-user-emacs-file "iota-data/elgrep-data.el"))
 (setopt use-short-answers t)
 
 ;; Suppress all interactive prompts during bootstrap
@@ -800,6 +800,34 @@ PRESET can be:
 ;;; Version Control & Projects
 ;;; ============================================================================
 
+(use-package diff-hl
+  :ensure t
+  :after nerd-icons
+  :hook ((prog-mode . diff-hl-mode)
+         (text-mode . diff-hl-mode)
+         (conf-mode . diff-hl-mode)
+         (dired-mode . diff-hl-dired-mode)
+         (magit-pre-refresh . diff-hl-magit-pre-refresh)
+         (magit-post-refresh . diff-hl-magit-post-refresh))
+  :general
+  (:prefix "C-c v"
+   "h" 'diff-hl-mode
+   "[" 'diff-hl-previous-hunk
+   "]" 'diff-hl-next-hunk
+   "=" 'diff-hl-show-hunk
+   "r" 'diff-hl-revert-hunk)
+  :config
+  ;; Use margin mode for terminal
+  (diff-hl-margin-mode 1)
+
+  ;; Use nerd-icons for diff symbols
+  (setq diff-hl-margin-symbols-alist
+        `((insert . ,(nerd-icons-codicon "nf-cod-diff_added"))
+          (delete . ,(nerd-icons-codicon "nf-cod-diff_removed"))
+          (change . ,(nerd-icons-codicon "nf-cod-diff_modified"))
+          (unknown . ,(nerd-icons-codicon "nf-cod-diff_renamed"))
+          (ignored . ,(nerd-icons-codicon "nf-cod-diff_ignored")))))
+
 (use-package magit
   :defer t
   :general
@@ -935,64 +963,42 @@ Generate ONLY the commit message, no explanations:" diff)))
 ;;; Knowledge Management
 ;;; ============================================================================
 
-(use-package denote
+(use-package obsidian
   :ensure t
+  :demand t
+  :config
+  (global-obsidian-mode t)
+  ;; Initialize vault cache after loading
+  (when (file-directory-p (expand-file-name obsidian-directory))
+   (obsidian-update))
+  :custom
+  ;; Location of obsidian vault
+  (obsidian-directory "~/Library/Mobile Documents/iCloud~md~obsidian/Documents/Vault")
+  ;; Default location for new notes from `obsidian-capture'
+  (obsidian-inbox-directory "Inbox")
+  (obsidian-daily-notes-directory "Journal")
+  (obsidian-templates-directory "Templates")
+  (obsidian-wiki-link-create-file-in-inbox t)
+  ;; Useful if you're going to be using wiki links
+  (markdown-enable-wiki-links t)
+  :bind
+  (:map obsidian-mode-map
+   ("C-c C-o" . obsidian-follow-link-at-point))
   :general
   (:prefix "C-c n"
-   "" '(:ignore t :which-key "denote")
-   "n" 'denote
-   "N" 'denote-type
-   "d" 'denote-date
-   "t" 'denote-template
-   "s" 'denote-subdirectory
-   "S" 'denote-signature
-   "f" 'denote-open-or-create
-   "F" 'denote-open-or-create-with-command
-   "r" 'denote-rename-file
-   "R" 'denote-rename-file-using-front-matter
-   "l" 'denote-link
-   "L" 'denote-find-link
-   "i" 'denote-link-or-create
-   "b" 'denote-find-backlink
-   "B" 'denote-show-backlinks-buffer
-   "k" 'denote-keywords-add
-   "K" 'denote-keywords-remove
-   "g" 'denote-grep
-   "D" 'denote-dired)
-  :custom
-  (denote-link-description-function 'denote-link-description-with-signature-and-title)
-  :config
-  (denote-rename-buffer-mode 1))
-
-(use-package denote-silo
-  :ensure t
-  :after denote
-  :config
-  (defun iota/denote-silo-for-project ()
-    "Set up Denote silo for the current project, or use default."
-    (let* ((project (project-current nil))
-           (silo-dir (if project
-                         (expand-file-name "silo/" (project-root project))
-                       (locate-user-emacs-file "iota-silo"))))
-      (unless (file-directory-p silo-dir)
-        (make-directory silo-dir t))
-      (setq denote-directory silo-dir)
-      silo-dir))
-
-  ;; Only create silos when actually using denote commands, not on every file open
-  (advice-add 'denote :before (lambda (&rest _) (iota/denote-silo-for-project)))
-  (advice-add 'denote-open-or-create :before (lambda (&rest _) (iota/denote-silo-for-project))))
-
-(use-package denote-markdown
-  :ensure t
-  :after denote
-  :config
-  (setq denote-file-type 'markdown-obsidian)
-  (setq denote-org-store-link-to-heading nil)
-  (setq denote-link-button-action 'find-file)
-  ;; Enable Markdown wiki links for better Obsidian compatibility
-  (setq markdown-enable-wiki-links t)
-  (setq markdown-wiki-link-search-type '(project)))
+   "" '(:ignore t :which-key "notes")
+   "n" 'obsidian-capture
+   "j" 'obsidian-jump
+   "d" 'obsidian-daily-note
+   "t" 'obsidian-tag-find
+   "l" 'obsidian-insert-link
+   "w" 'obsidian-insert-wikilink
+   "b" 'obsidian-backlink-jump
+   "f" 'obsidian-follow-link-at-point
+   "s" 'obsidian-search
+   "m" 'obsidian-move-file
+   "g" 'obsidian-grep
+   "v" 'obsidian-jump))
 
 ;;; ============================================================================
 ;;; AI Assistance
