@@ -1455,4 +1455,16 @@ If a header already exists, update it. Otherwise, insert a new one."
               ;; Force=t bypasses file-buffer check (custom.el may be open)
               (iota-splash-screen t))))
 
+;;; ============================================================================
+;;; Fix for pixi/conda-installed Emacs missing share/info/dir
+;;; ============================================================================
+
+(with-eval-after-load 'info
+  (let ((dir-file (expand-file-name "dir" configure-info-directory))
+        (emacs-dir (expand-file-name "emacs-dir" configure-info-directory)))
+    (when (and (not (file-exists-p dir-file))
+               (file-exists-p emacs-dir))
+      (copy-file emacs-dir dir-file t)
+      (message "Info: Created dir from emacs-dir"))))
+
 ;;; init.el ends here
